@@ -1,0 +1,1178 @@
+---
+title: "Figure tables"
+author: "Jahred Liddie"
+output:
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+library(qwraps2)
+library(maps)
+library(knitr)
+library(stargazer)
+library(tidyverse)
+library(sf)
+
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.height = 5, fig.width = 8)
+
+```
+
+```{r, include = FALSE}
+# these datasets are loaded from the statewide sampling repository
+CWS_FN <- read.csv("/Users/jahredl/Dropbox/State PFAS data/Merged PFAS data/final_dat_FN.csv")
+CWS_RW <- read.csv("/Users/jahredl/Dropbox/State PFAS data/Merged PFAS data/final_dat_RW.csv")
+dat <- read.csv("/Users/jahredl/Dropbox/State PFAS data/Merged PFAS data/dat.csv")
+
+SDWIS <- read_csv("../SDWIS/EnvirofactsRestAPI.csv")
+HUC.PFAS <- st_read("../Merged PFAS data/HUCs_for_analysis.geojson")
+
+# cleaned up UCMR dataset with only the CWS that sampled PFAS
+ucmr <- read.csv("../Merged PFAS data/UCMR_data.csv")
+```
+
+# Summary tables (supplement)
+```{r, results = 'asis', echo = FALSE}
+options(qwraps2_markup = 'markdown')
+
+summary_stats <-
+  list("Table 1" =
+       list("Total population served [millions]" = ~round(sum(population_served)/1000000, 1),
+            "Mean % Black" = ~mean_sd(percBlack, digits = 1),
+            "Mean % Hispanic" = ~mean_sd(percHisp, digits = 1),
+            "Mean % under poverty line" = ~mean_sd(poverty, digits = 1),
+            "Mean % residents in urban areas" = ~mean_sd(percurban, digits = 1),
+            "Number of large or very large systems" = ~n_perc(PWS_size_tri == "Large or very large", na_rm=T, digits = 1),
+            "Number of medium" = ~n_perc(PWS_size_tri == "Medium", na_rm=T, digits = 1),
+            "Number of small or very small systems" = ~n_perc(PWS_size_tri == "Small or very small", na_rm=T, digits = 1),
+            "Number of systems with SW" = ~n_perc(GW_SW == "SW", na_rm = T, digits = 1),                                        
+            ">= 1 airport in HUC" = ~n_perc(any_airport=="One or more", na_rm = T, digits = 1),
+            ">= 1 MFTA in HUC" = ~n_perc(any_MFTA=="One or more", na_rm=T, digits = 1),
+            "Total existing effluent in HUC [Mgal/day]" = ~mean_sd(WWTP_existingtotalflow_Mgal.d, digits = 1),
+            "Total existing effluent per area [Mgal/mi2-day]" = ~mean_sd(WWTP_existingtotalflow_Mgal.d.sqmi, digits = 1),
+            "Number of landfills in HUC" = ~mean_sd(landfill.LMOP_count, digits = 1),
+            "Systems with recommended PFAS treatment" = ~n_perc(treatment, na_rm = T, digits = 1),
+            "Mean number of total measurements" = ~mean_sd(all_measurements, digits = 1),
+            "Ever detect of PFOA" = ~n_perc(PFOA_detect, na_rm = T, digits = 1),
+            "Ever detect of PFOS" = ~n_perc(PFOS_detect, na_rm = T, digits = 1),
+            "Ever detect of PFNA" = ~n_perc(PFNA_detect, na_rm = T, digits = 1),
+            "Ever detect of PFHxS" = ~n_perc(PFHxS_detect, na_rm = T, digits = 1),
+            "Ever detect of PFBS" = ~n_perc(PFBS_detect, na_rm=T, digits = 1),
+            "Ever detect of any of 5 PFAS" = ~n_perc(Any_detect, na_rm=T, digits = 1),
+            "Ever exceedance of MI PFOA MCL (8 ng/L)" = ~n_perc(above_PFOA_reg, na_rm=T, digits = 1),
+            "Ever exceedance of NY PFOS MCL (10 ng/L)" = ~n_perc(above_PFOS_reg, na_rm=T, digits = 1),
+            "Ever exceedance of MI PFNA MCL (6 ng/L)" = ~n_perc(above_PFNA_reg, na_rm = T, digits = 1),
+            "Ever exceedance of NH PFHxS MCL (18 ng/L)" = ~n_perc(above_PFHxS_reg, na_rm = T, digits = 1),
+            "Ever exceedance of MI PFBS MCL (420 ng/L)" = ~n_perc(above_PFBS_reg, na_rm = T, digits = 1),
+            "Ever exceedance of EPA LHA" = ~n_perc(above_EPA_LHA, na_rm=T, digits = 1)))
+
+qwraps2::summary_table(CWS_FN, summary_stats)
+# qwraps2::summary_table(CWS_RW, summary_stats)
+
+# qwraps2::summary_table(CWS_FN %>% group_by(State), summary_stats)
+
+qwraps2::summary_table(CWS_FN %>% group_by(PWS_size_tri), summary_stats)
+# qwraps2::summary_table(CWS_RW %>% group_by(PWS_size_tri), summary_stats)
+
+```
+
+# Tabulating people served with outcome measures (supplement)
+```{r, results='asis'}
+
+pop_table <-
+  list("Outcome measures" =
+       list("Ever detect of PFOA" = ~n_perc(PFOA_detect, na_rm = T),
+            "Ever detect of PFOS" = ~n_perc(PFOS_detect, na_rm = T),
+            "Ever detect of PFNA" = ~n_perc(PFNA_detect, na_rm = T),
+            "Ever detect of PFHxS" = ~n_perc(PFHxS_detect, na_rm = T),
+            "Ever detect of PFBS" = ~n_perc(PFBS_detect, na_rm=T),
+            "Ever detect of five PFAS" = ~n_perc(Any_detect, na_rm=T),
+            "Ever exceedance of MI PFOA MCL (8 ng/L)" = ~n_perc(above_PFOA_reg, na_rm=T, digits = 1),
+            "Ever exceedance of NY PFOS MCL (10 ng/L)" = ~n_perc(above_PFOS_reg, na_rm=T, digits = 1),
+            "Ever exceedance of MI PFNA MCL (6 ng/L)" = ~n_perc(above_PFNA_reg, na_rm = T, digits = 1),
+            "Ever exceedance of NH PFHxS MCL (18 ng/L)" = ~n_perc(above_PFHxS_reg, na_rm = T, digits = 1),
+            "Ever exceedance of MI PFBS MCL (420 ng/L)" = ~n_perc(above_PFBS_reg, na_rm = T, digits = 1),
+            "Ever exceedance of EPA LHA" = ~n_perc(above_EPA_LHA, na_rm=T, digits = 1),
+            "Ever exceedance of any of these MCL or the LHA" = ~n_perc(above_any_reg, na_rm = T, digits = 1)),
+       "Population served [millions]" =
+        list("Ever detect of PFOA" = ~round(sum(ifelse(PFOA_detect==1,
+                                            population_served, 0), na.rm = T)/10^6, 1),
+             "Ever detect of PFOS" = ~round(sum(ifelse(PFOS_detect==1,
+                                            population_served, 0), na.rm = T)/10^6, 1),
+             "Ever detect of PFNA" = ~round(sum(ifelse(PFNA_detect==1,
+                                            population_served, 0), na.rm = T)/10^6, 1),
+             "Ever detect of PFHxS" = ~round(sum(ifelse(PFHxS_detect==1,
+                                            population_served, 0), na.rm = T)/10^6, 1),
+             "Ever detect of PFBS" = ~round(sum(ifelse(PFBS_detect==1,
+                                            population_served, 0), na.rm = T)/10^6, 1),
+             "Ever detect of five PFAS" = ~round(sum(ifelse(Any_detect==1,
+                                                 population_served, 0), na.rm = T)/10^6, 1),
+             "Ever exceedance of MI PFOA MCL (8 ng/L)" = ~round(sum(ifelse(above_PFOA_reg ==1,
+                                                   population_served, 0), na.rm = T)/10^6, 1),
+             "Ever exceedance of NY PFOS MCL (10 ng/L)" = ~round(sum(ifelse(above_PFOS_reg ==1,
+                                                   population_served, 0), na.rm = T)/10^6, 1),
+             "Ever exceedance of MI PFNA MCL (6 ng/L)" = ~round(sum(ifelse(above_PFNA_reg ==1,
+                                                   population_served, 0), na.rm = T)/10^6, 1),
+             "Ever exceedance of NH PFHxS MCL (18 ng/L)" = ~round(sum(ifelse(above_PFHxS_reg ==1,
+                                                   population_served, 0), na.rm = T)/10^6, 1),
+             "Ever exceedance of MI PFBS MCL (420 ng/L)" = ~round(sum(ifelse(above_PFBS_reg ==1,
+                                                   population_served, 0), na.rm = T)/10^6, 1),
+             "Ever exceedance of EPA LHA" = ~round(sum(ifelse(above_EPA_LHA == 1,
+                                                   population_served, 0), na.rm = T)/10^6, 1),
+             "Ever exceedance of any MCL or the LHA" = ~round(sum(ifelse(above_any_reg == 1,
+                                                   population_served, 0), na.rm = T)/10^6, 1)
+        )
+       )
+
+# add any reg indicator: FIX
+CWS_FN$above_any_reg <- with(data = CWS_FN,
+                             ifelse((above_PFOA_reg > 0 |
+                                    above_PFOS_reg > 0 |
+                                    above_PFNA_reg > 0 | 
+                                    above_PFHxS_reg > 0 |
+                                    above_PFBS_reg > 0) &
+                                    (!is.na(above_PFOA_reg) & !is.na(above_PFOS_reg) &
+                                    !is.na(above_PFNA_reg) & !is.na(above_PFHxS_reg) &
+                                    !is.na(above_PFBS_reg)), 1,
+                             ifelse(!is.na(above_PFOA_reg) & !is.na(above_PFOS_reg) &
+                                    !is.na(above_PFNA_reg) & !is.na(above_PFHxS_reg) &
+                                    !is.na(above_PFBS_reg),
+                                    0, NA)))
+
+qwraps2::summary_table(CWS_FN, pop_table)
+# qwraps2::summary_table(CWS_RW, pop_table)
+
+```
+
+# Comparison with all CWS in SDWIS and with UCMR
+```{r, results = 'asis', echo = FALSE}
+states <- paste("^", unique(dat$State), sep = "")
+states[states == "^UT"] <- "^UTAH" # replacement due to SDWIS conventions for Utah
+
+SDWIS <- SDWIS %>% dplyr::select(WATER_SYSTEM.PWSID, WATER_SYSTEM.PWS_NAME,
+                                 WATER_SYSTEM.PRIMACY_AGENCY_CODE, 
+                                 WATER_SYSTEM.PWS_TYPE_CODE,
+                                 WATER_SYSTEM.CITY_NAME, 
+                                 WATER_SYSTEM.ZIP_CODE,
+                                 WATER_SYSTEM.ADDRESS_LINE1,
+                                 WATER_SYSTEM.ADDRESS_LINE2,
+                                 WATER_SYSTEM.GW_SW_CODE, 
+                                 WATER_SYSTEM.POPULATION_SERVED_COUNT,
+                                 WATER_SYSTEM.PRIMARY_SOURCE_CODE, 
+                                 WATER_SYSTEM.CITIES_SERVED,
+                                 WATER_SYSTEM.COUNTIES_SERVED, 
+                                 WATER_SYSTEM.SERVICE_CONNECTIONS_COUNT) %>%
+  dplyr::rename(PWSID = WATER_SYSTEM.PWSID,
+                PWS_name_SDWIS = WATER_SYSTEM.PWS_NAME,
+                primary_agency = WATER_SYSTEM.PRIMACY_AGENCY_CODE,
+                PWS_type = WATER_SYSTEM.PWS_TYPE_CODE,
+                System_addressL1 = WATER_SYSTEM.ADDRESS_LINE1,
+                System_addressL2 = WATER_SYSTEM.ADDRESS_LINE2,
+                System_city = WATER_SYSTEM.CITY_NAME,
+                Zip_code = WATER_SYSTEM.ZIP_CODE,
+                GW_SW = WATER_SYSTEM.GW_SW_CODE,
+                population_served = WATER_SYSTEM.POPULATION_SERVED_COUNT,
+                primary_source = WATER_SYSTEM.PRIMARY_SOURCE_CODE,
+                cities_served = WATER_SYSTEM.CITIES_SERVED,
+                counties_served = WATER_SYSTEM.COUNTIES_SERVED,
+                connections = WATER_SYSTEM.SERVICE_CONNECTIONS_COUNT)
+
+# SDWIS with all states and 
+SDWIS <- SDWIS %>%
+  mutate(PWS_size = ifelse(population_served <= 500, "Very Small", 
+                           ifelse(population_served <= 3300, "Small", 
+                                  ifelse(population_served <= 10000, "Medium",
+                                         ifelse(population_served <= 100000, "Large", "Very Large")))),
+           PWS_size_tri = ifelse(population_served <=3300, "Small or very small",
+                                 ifelse(population_served <= 10000, "Medium", "Large or very large")))
+
+SDWIS <- SDWIS %>% filter(PWS_type == "CWS")
+
+# just states included in this study
+SDWIS_states <- SDWIS %>% filter(grepl(paste(states, collapse="|"), PWSID))
+SDWIS_states <- SDWIS_states %>% filter(PWS_type == "CWS")
+
+SDWIS_comparison <-
+  list("Table 1" =
+       list(
+         "Number of large or very large systems" = ~n_perc(PWS_size_tri == "Large or very large", na_rm=T, digits = 1),
+            "Number of medium" = ~n_perc(PWS_size_tri == "Medium", na_rm=T, digits = 1),
+            "Number of small or very small systems" = ~n_perc(PWS_size_tri == "Small or very small", na_rm=T, digits = 1),
+            "Number of systems with SW" = ~n_perc(GW_SW == "SW", na_rm = T, digits = 1))
+       )
+
+qwraps2::summary_table(SDWIS, SDWIS_comparison)
+qwraps2::summary_table(SDWIS_states, SDWIS_comparison)
+qwraps2::summary_table(CWS_FN, SDWIS_comparison)
+qwraps2::summary_table(ucmr, SDWIS_comparison)
+
+```
+
+
+
+# T-tests comparing county-served populations with/without detects + MCL exceedances (supplement)
+```{r warning = F, results = 'asis', echo = FALSE}
+# t.tests with unequal variance assumption
+dem.vars <- tibble(dem.var = c("scaleHisp", "scaleBlack", "scalepoverty", "uninsured"),
+                   dem.var.clean = c("% Hispanic residents", "% Black residents", 
+                                     "% residents under\nthe poverty line",
+                                     "% uninsured")
+                   )
+
+PFAS.vars <- c("PFOA_detect", "PFOS_detect", "PFNA_detect",
+               "PFHxS_detect", "PFBS_detect", "Any_detect",
+               "above_PFOA_reg", "above_PFOS_reg", "above_PFNA_reg",
+               "above_PFHxS_reg", "above_EPA_LHA", "above_any_reg")
+
+t.test.df <- expand_grid(
+  dem.vars, PFAS.vars
+)
+
+t.test.df <- t.test.df %>%
+  mutate(
+    dem.var.unscale = case_when(dem.var == "scaleHisp" ~ "percHisp",
+                                dem.var == "scaleBlack" ~ "percBlack",
+                                dem.var == "scalepoverty" ~ "poverty",
+                                dem.var == "uninsured" ~ "uninsured"),
+    group0 = 0,
+    group1 = 0,
+    group0_unscale = 0,
+    group1_unscale = 0,
+    p.value = 0,
+    n = 0
+)
+ 
+for (i in seq_along(dem.vars$dem.var)){
+  
+  for (j in seq_along(PFAS.vars)){
+  
+  test <- with(CWS_FN, 
+               t.test(formula(
+                      paste(dem.vars$dem.var[i], "~", PFAS.vars[j])
+              )
+             )
+            )
+  
+  # retrieve stats
+  t.test.df$group0[t.test.df$dem.var==dem.vars$dem.var[i] & 
+                     t.test.df$PFAS.vars==PFAS.vars[j]] <- test$estimate[1]
+  t.test.df$group1[t.test.df$dem.var==dem.vars$dem.var[i] & 
+                     t.test.df$PFAS.vars==PFAS.vars[j]]  <- test$estimate[2]
+  t.test.df$p.value[t.test.df$dem.var==dem.vars$dem.var[i] & 
+                     t.test.df$PFAS.vars==PFAS.vars[j]]  <- ifelse(test$p.value < 0.001,
+                                                                  "<0.001", 
+                                                                  round(test$p.value,3))
+  # raw percentages
+  t.test.df$group0_unscale[t.test.df$dem.var==dem.vars$dem.var[i] &
+                            t.test.df$PFAS.vars==PFAS.vars[j]] <-
+    mean(CWS_FN[[t.test.df$dem.var.unscale[t.test.df$dem.var==dem.vars$dem.var[i] & t.test.df$PFAS.vars==PFAS.vars[j]]]]) + sd(CWS_FN[[t.test.df$dem.var.unscale[t.test.df$dem.var==dem.vars$dem.var[i] & t.test.df$PFAS.vars==PFAS.vars[j]]]]) * 
+            t.test.df$group0[t.test.df$dem.var==dem.vars$dem.var[i] & t.test.df$PFAS.vars==PFAS.vars[j] ]
+  
+  t.test.df$group0_unscale <- round(t.test.df$group0_unscale, 1)
+  
+    t.test.df$group1_unscale[t.test.df$dem.var==dem.vars$dem.var[i] &
+                            t.test.df$PFAS.vars==PFAS.vars[j]] <-
+    mean(CWS_FN[[t.test.df$dem.var.unscale[t.test.df$dem.var==dem.vars$dem.var[i] & t.test.df$PFAS.vars==PFAS.vars[j]]]]) + sd(CWS_FN[[t.test.df$dem.var.unscale[t.test.df$dem.var==dem.vars$dem.var[i] & t.test.df$PFAS.vars==PFAS.vars[j]]]]) * 
+            t.test.df$group1[t.test.df$dem.var==dem.vars$dem.var[i] & t.test.df$PFAS.vars==PFAS.vars[j] ]
+    
+    t.test.df$group1_unscale <- round(t.test.df$group1_unscale, 1)
+    
+  t.test.df$n[t.test.df$dem.var==dem.vars$dem.var[i] & 
+                     t.test.df$PFAS.vars==PFAS.vars[j]]  <- sum(!is.na(select(CWS_FN, PFAS.vars[j]))==T) 
+  # sample size of test
+  }
+}
+
+t.test.df$PFAS.vars <- factor(t.test.df$PFAS.vars,
+                             levels = c("PFOA_detect","PFOS_detect",
+                                        "PFNA_detect","PFHxS_detect",
+                                        "PFBS_detect","Any_detect",
+                                        "above_PFOA_reg","above_PFOS_reg",
+                                        "above_PFNA_reg","above_PFHxS_reg",
+                                        "above_EPA_LHA", "above_any_reg")
+                             )
+
+# print out results
+knitr::kable(t.test.df[order(t.test.df$dem.var.clean, 
+                             t.test.df$PFAS.vars),])
+             
+```
+
+# T-tests: PFAS contamination
+```{r}
+CWS_FN$WWTP_flow.median <- ifelse(CWS_FN$WWTP_existingtotalflow_Mgal.d <=
+                                    median(CWS_FN$WWTP_existingtotalflow_Mgal.d),
+                                  "<= Median", "> Median")
+
+CWS_FN$landfill_median <- ifelse(CWS_FN$landfill.LMOP_count <=
+                                  median(CWS_FN$landfill.LMOP_count),
+                                  "<= Median", "> Median")
+
+# t.tests with unequal variance assumption
+dem.vars <- tibble(dem.var = c("scaleHisp", "scaleBlack", "scalepoverty"),
+                   dem.var.clean = c("Hispanic residents", "Black residents", 
+                                     "Residents under\nthe poverty line")
+                   )
+
+contam.vars <- tibble(
+  contam.vars = c("any_MFTA", "any_airport", "any_industry", "WWTP_flow.median", "landfill_median"),
+  contam.var.clean = c(">1 MFTA", ">1 airport", ">1 major industry", "> median WWTP\neffluent", "> median landfills")
+)
+
+contam.vars$contam.var.clean <- fct_relevel(contam.vars$contam.var.clean,
+                                            ">1 MFTA", ">1 airport", ">1 major industry", "> median WWTP\neffluent",
+                                            "> median landfills")
+
+t.test.df2 <- expand_grid(
+  dem.vars, contam.vars
+)
+
+t.test.df2 <- t.test.df2 %>%
+  mutate(
+    dem.var.unscale = case_when(dem.var == "scaleHisp" ~ "percHisp",
+                                dem.var == "scaleBlack" ~ "percBlack",
+                                dem.var == "scalepoverty" ~ "poverty"),
+    group0 = 0,
+    group1 = 0,
+    group0_unscale = 0,
+    group1_unscale = 0,
+    p.value = 0,
+    n = 0
+)
+ 
+for (i in seq_along(dem.vars$dem.var)){
+  
+  for (j in seq_along(contam.vars$contam.vars)){
+  
+  test <- with(CWS_FN, 
+               t.test(formula(
+                      paste(dem.vars$dem.var[i], "~", contam.vars$contam.vars[j])
+              )
+             )
+            )
+  
+  # retrieve stats
+  t.test.df2$group0[t.test.df2$dem.var==dem.vars$dem.var[i] & 
+                     t.test.df2$contam.vars==contam.vars$contam.vars[j]] <- test$estimate[1]
+  t.test.df2$group1[t.test.df2$dem.var==dem.vars$dem.var[i] & 
+                     t.test.df2$contam.vars==contam.vars$contam.vars[j]]  <- test$estimate[2]
+  t.test.df2$p.value[t.test.df2$dem.var==dem.vars$dem.var[i] & 
+                     t.test.df2$contam.vars==contam.vars$contam.vars[j]]  <- ifelse(test$p.value < 0.001,
+                                                                  "<0.001", 
+                                                                  round(test$p.value,3))
+  # raw percentages
+  t.test.df2$group0_unscale[t.test.df2$dem.var==dem.vars$dem.var[i] &
+                            t.test.df2$contam.vars==contam.vars$contam.vars[j]] <-
+    mean(CWS_FN[[t.test.df2$dem.var.unscale[t.test.df2$dem.var==dem.vars$dem.var[i] & t.test.df2$contam.vars==contam.vars$contam.vars[j]]]]) + sd(CWS_FN[[t.test.df2$dem.var.unscale[t.test.df2$dem.var==dem.vars$dem.var[i] & t.test.df2$contam.vars==contam.vars$contam.vars[j]]]]) * 
+            t.test.df2$group0[t.test.df2$dem.var==dem.vars$dem.var[i] & t.test.df2$contam.vars==contam.vars$contam.vars[j] ]
+  
+  t.test.df2$group0_unscale <- round(t.test.df2$group0_unscale, 1)
+  
+    t.test.df2$group1_unscale[t.test.df2$dem.var==dem.vars$dem.var[i] &
+                            t.test.df2$contam.vars==contam.vars$contam.vars[j]] <-
+    mean(CWS_FN[[t.test.df2$dem.var.unscale[t.test.df2$dem.var==dem.vars$dem.var[i] & t.test.df2$contam.vars==contam.vars$contam.vars[j]]]]) + sd(CWS_FN[[t.test.df2$dem.var.unscale[t.test.df2$dem.var==dem.vars$dem.var[i] & t.test.df2$contam.vars==contam.vars$contam.vars[j]]]]) * 
+            t.test.df2$group1[t.test.df2$dem.var==dem.vars$dem.var[i] & t.test.df2$contam.vars==contam.vars$contam.vars[j] ]
+    
+    t.test.df2$group1_unscale <- round(t.test.df2$group1_unscale, 1)
+    
+  t.test.df2$n[t.test.df2$dem.var==dem.vars$dem.var[i] & 
+                     t.test.df2$contam.vars==contam.vars$contam.vars[j]]  <- sum(!is.na(select(CWS_FN, contam.vars$contam.vars[j]))==T) 
+  # sample size of test
+  }
+}
+
+# print out results
+knitr::kable(t.test.df2[order(t.test.df2$dem.var.clean, 
+                             t.test.df2$contam.vars),])
+
+t.test.df2 <- t.test.df2 %>%
+  mutate(stars = ifelse(p.value == "<0.001", "***",
+                   ifelse(as.numeric(p.value) < 0.01, "***", 
+                          ifelse(as.numeric(p.value) < 0.05, "**",
+                                 ifelse(as.numeric(p.value) < 0.1, "*")
+                                 )
+                          )
+                   )
+  )
+  
+ggplot(t.test.df2) +
+  geom_segment(aes(x = contam.var.clean, xend = contam.var.clean, y = group0_unscale, yend = group1_unscale)) +
+  geom_point(aes(x = contam.var.clean, y = group0_unscale, color = "Water systems without sources"), size = 4) +
+  geom_point(aes(x = contam.var.clean, y = group1_unscale, color = "Water systems with sources"), size = 4) +
+  scale_color_manual(values = MetBrewer::met.brewer("Homer2", 2), name = "") +
+  geom_text(aes(x = contam.var.clean, label = stars), nudge_x = 0,
+            y = ifelse(t.test.df2$dem.var == "scalepoverty", 0.4 + t.test.df2$group0_unscale, 0.4 + t.test.df2$group1_unscale),
+            size = 5) +
+  scale_y_continuous(expand = expansion(mult = 0.2), labels = function(x) {scales::percent(x/100, accuracy = 1)}) +
+  labs(y = "Sociodemographics of communities served",
+       x = "") +
+  facet_grid(dem.var.clean~., scales = "free_y") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15, face = "bold"),
+        axis.title = element_text(size = 20),
+        legend.position = "top",
+        legend.justification = "left",
+        legend.direction = "vertical",
+        legend.text = element_text(size = 15, face = "bold"),
+        plot.margin = margin(t = 20,  
+                             r = 20,  
+                             b = 20,  
+                             l = 20),
+        strip.text.y = element_text(size = 15),
+        panel.spacing = unit(1.2, "lines"),
+        strip.background = element_rect(fill="white"))
+
+if (FALSE){ 
+  ggsave("../Figures/mean comparison_sources.png", dpi = 600,
+        width = 12, height = 8)
+}
+```
+
+# T-tests: HUC data (first frequences ~ binary source categories) (supplement)
+```{r}
+HUC.PFAS$WWTP_flow.median <- ifelse(HUC.PFAS$WWTP_existingtotalflow_Mgal.d <=
+                                median(HUC.PFAS$WWTP_existingtotalflow_Mgal.d),
+                                  "<= Median", "> Median")
+HUC.PFAS$landfill_median <- ifelse(HUC.PFAS$landfill.LMOP_count <=
+                                median(HUC.PFAS$landfill.LMOP_count),
+                                  "<= Median", "> Median")
+
+# t.tests with unequal variance assumption
+PFAS.vars <- c("PFOA_detect", "PFOS_detect", "PFNA_detect",
+               "PFHxS_detect", "PFBS_detect", "Any_detect")
+
+contam.vars <- c("any_MFTA", "any_airport", "any_industry", "WWTP_flow.median", "landfill_median")
+
+t.test_HUC <- expand_grid(
+  PFAS.vars, contam.vars
+)
+
+t.test_HUC <- t.test_HUC %>%
+  mutate(
+    group0 = 0,
+    group1 = 0,
+    p.value = 0,
+    n = 0
+)
+ 
+for (i in seq_along(PFAS.vars)){
+  
+  for (j in seq_along(contam.vars)){
+  
+  test <- with(HUC.PFAS[!st_is_empty(HUC.PFAS$geometry),], 
+               t.test(formula(
+                      paste(PFAS.vars[i], "~", contam.vars[j])
+              )
+             )
+            )
+  
+  # retrieve stats
+  t.test_HUC$group0[t.test_HUC$PFAS.vars==PFAS.vars[i] & 
+                     t.test_HUC$contam.vars==contam.vars[j]] <- round(test$estimate[1], 2)
+  t.test_HUC$group1[t.test_HUC$PFAS.vars==PFAS.vars[i] & 
+                     t.test_HUC$contam.vars==contam.vars[j]]  <- round(test$estimate[2], 2)
+  t.test_HUC$p.value[t.test_HUC$PFAS.vars==PFAS.vars[i] & 
+                     t.test_HUC$contam.vars==contam.vars[j]]  <- ifelse(test$p.value < 0.001,
+                                                                  "<0.001", 
+                                                                  round(test$p.value,3))
+  # sample size of test (messy code here  due to looping)
+  t.test_HUC$n[t.test_HUC$PFAS.vars==PFAS.vars[i] & 
+               t.test_HUC$contam.vars==contam.vars[j]]  <- sum(
+                 !is.na(select(HUC.PFAS[!st_is_empty(HUC.PFAS$geometry),] %>% st_drop_geometry(), PFAS.vars[i]))==T)
+  }
+}
+
+# print out results
+knitr::kable(t.test_HUC[order(t.test_HUC$PFAS.vars, 
+                              t.test_HUC$contam.vars),])
+```
+
+
+# HUCs again (now binary outcome ~ count of sources (or magnitude of source indicator)) 
+```{r}
+# t.tests with unequal variance assumption
+PFAS.vars <- c("PFOA_detect", "PFOS_detect", "PFNA_detect",
+               "PFHxS_detect", "PFBS_detect", "Any_detect")
+
+contam.vars <- c("MFTA_count", "airport_count", "industries_count", "WWTP_count", "WWTP_logflow", "landfill.LMOP_count")
+
+t.test_HUC2 <- expand_grid(
+  PFAS.vars, contam.vars
+)
+
+t.test_HUC2 <- t.test_HUC2 %>%
+  mutate(
+    group0 = 0,
+    group1 = 0,
+    p.value = 0,
+    n = 0
+)
+ 
+for (i in seq_along(PFAS.vars)){
+  
+  for (j in seq_along(contam.vars)){
+  
+  test <- with(HUC.PFAS[!st_is_empty(HUC.PFAS$geometry), ], 
+               t.test(formula(
+                      paste(contam.vars[j], "~", PFAS.vars[i])
+              )
+             )
+            )
+  
+  # retrieve stats
+  t.test_HUC2$group0[t.test_HUC2$PFAS.vars==PFAS.vars[i] & 
+                     t.test_HUC2$contam.vars==contam.vars[j]] <- round(test$estimate[1], 2)
+  t.test_HUC2$group1[t.test_HUC2$PFAS.vars==PFAS.vars[i] & 
+                     t.test_HUC2$contam.vars==contam.vars[j]]  <- round(test$estimate[2], 2)
+  t.test_HUC2$p.value[t.test_HUC2$PFAS.vars==PFAS.vars[i] & 
+                      t.test_HUC2$contam.vars==contam.vars[j]]  <- ifelse(test$p.value < 0.001,
+                                                                  "<0.001", 
+                                                                  round(test$p.value,3))
+    # sample size of test (messy code here  due to looping)
+  t.test_HUC2$n[t.test_HUC2$PFAS.vars==PFAS.vars[i] & 
+               t.test_HUC2$contam.vars==contam.vars[j]]  <- sum(
+                 !is.na(select(HUC.PFAS[!st_is_empty(HUC.PFAS$geometry),] %>% st_drop_geometry(), PFAS.vars[i]))==T)
+  }
+}
+
+# print out results
+knitr::kable(t.test_HUC2[order(t.test_HUC2$PFAS.vars, 
+                               t.test_HUC2$contam.vars),])
+```
+
+# HUC data: Spatial regression models (figure for poster presentations only)
+```{r, warning = FALSE, message = FALSE}
+source("1a_HUC processing and modelling.R")
+
+# dropping PFNA from both analyses because of the non-normal residuals and low detection frequencies (see plots)
+HUC_main.models <- HUC_main.models %>% filter(outcome.name != "PFNA")
+HUC_exclude.NDs <- HUC_exclude.NDs %>% filter(outcome.name != "PFNA")
+
+HUC_main.models$full.coefficient <- with(HUC_main.models, 
+                                         paste(percent.change, " [", LCI, ", ", UCI, "]", sep = ""))
+HUC_main.models <- HUC_main.models %>%
+ mutate(dep.var = fct_relevel(dep.var, levels = c("MFTA_count", "airport_count", "industries_count",
+                                                  "WWTP_logflow", "landfill.LMOP_count", "lambda",
+                                                  "(Intercept)")),
+        outcome = fct_relevel(outcome, "logPFOA", "logPFOS","logPFNA",
+                                       "logPFBS", "logPFHxS")
+        )
+
+knitr::kable(HUC_main.models[order(HUC_main.models$outcome, 
+                                   HUC_main.models$dep.var, decreasing =F),] %>% 
+               select(-formula, -percent.change, -UCI, -LCI, -coefficient, -coef.se, -t.value, -AIC) %>%
+               filter(dep.var != "(Intercept)"))
+
+HUC_exclude.NDs$full.coefficient <- with(HUC_exclude.NDs, 
+                                         paste(percent.change, " [", LCI, ", ", UCI, "]", sep = ""))
+
+HUC_exclude.NDs <- HUC_exclude.NDs %>%
+ mutate(dep.var = fct_relevel(dep.var, levels = c("MFTA_count", "airport_count", "industries_count",
+                                       "WWTP_logflow", "landfill.LMOP_count", "lambda",
+                                       "(Intercept)")),
+        outcome = fct_relevel(outcome, "logPFOA", "logPFOS","logPFNA",
+                                       "logPFBS", "logPFHxS")
+        )
+
+knitr::kable(HUC_exclude.NDs[order(HUC_exclude.NDs$outcome, 
+                                   HUC_exclude.NDs$dep.var, decreasing =F),]  %>% 
+             select(-formula, -percent.change, -UCI, -LCI, -coefficient, -coef.se, -t.value, -AIC) %>%
+               filter(dep.var != "(Intercept)"))
+
+top_sources <- HUC_main.models %>%
+  filter(!is.na(coefficient.order)) %>%
+  arrange(coefficient.order) %>%
+  group_by(outcome.name) %>%
+  slice(1:3) %>%
+  mutate(coefficient.order = row_number())
+
+top_sources$coefficient.order <- as.factor(top_sources$coefficient.order)
+top_sources$outcome.name <- fct_relevel(top_sources$outcome.name, 
+                                        levels = c("PFOA", "PFOS", "PFNA", "PFHxS", "PFBS")
+)
+                                        
+img <- paste("../Figures/images/", list.files("../Figures/images"), sep ="")
+
+top_sources <- top_sources %>% 
+  mutate(dep.var.name = case_when(dep.var == "industries_count" ~ "Major industrial facilities",
+                                  dep.var == "WWTP_logflow" ~ "WWTP total effluent",
+                                  dep.var == "MFTA_count" ~ "Military fire training areas",
+                                  dep.var == "airport_count" ~ "AFFF-certified airports",
+                                  dep.var == "landfill.LMOP_count" ~ "Landfills",
+                                  TRUE ~ as.character(NA)),
+         p.value.plot = as.numeric(ifelse(p.value == "<0.001", 0.001, p.value)),
+         stars.plot = ifelse(p.value.plot < 0.01, "***", 
+                             ifelse(p.value.plot < 0.05, "**",
+                                    ifelse(p.value.plot < 0.1, "*", ""))),
+         image = case_when(dep.var == "industries_count" ~ img[2],
+                           dep.var == "WWTP_logflow" ~ img[5],
+                           dep.var == "MFTA_count" ~ img[4],
+                           dep.var == "airport_count" ~ img[1],
+                           dep.var == "landfill.LMOP_count" ~ img[3],
+                           TRUE ~ as.character(NA))
+  )
+           
+ggplot(top_sources, aes(y = 1, x = outcome.name, 
+                        group = coefficient.order)) +
+  geom_bar(aes(fill = percent.change, color = percent.change), 
+            stat = "identity") +
+  geom_label(aes(label = paste(round(percent.change, 0), "%", stars.plot, sep = "")), 
+             size = 7, position = position_stack(vjust = 0.2),
+             fontface = ifelse(top_sources$p.value.plot < 0.1, "bold.italic", "plain")) +
+  ggimage::geom_image(aes(image = image), size = 0.1, by = "height", position = position_stack(vjust = 0.5)) +
+  scale_fill_gradient(trans = "log", breaks = c(2, 4, 8, 16, 32, 64),
+                      labels =  scales::percent(c(0/100, 25/100, 50/100, 75/100, 100/100, 125/100), accuracy = 1),
+                       name = "Increase in\nconcentration",
+                       limits = c(1, NA),
+                       low = "white",
+                       high = "darkgreen") +
+    scale_color_gradient(trans = "log", breaks = c(2, 4, 8, 16, 32, 64),
+                         labels =  scales::percent(c(0/100, 25/100, 50/100, 75/100, 100/100, 125/100), accuracy = 1),
+                         name = "Increase in\nconcentration",
+                         limits = c(1, NA),
+                         low = "white",
+                         high = "darkgreen") +
+  labs(y = "", x = "") +
+  theme_void() +
+  theme(axis.text.y = element_blank(),
+        axis.text.x = element_text(face = "bold", size = 25),
+        axis.title.y = element_text(face = "bold", size = 25, angle = 90,
+                                    margin = margin(t = 0, r = 10, b = 0, l = 0)),
+        legend.text = element_text(size = 25, face = "bold"),
+        legend.title = element_text(size = 25, face = "bold"),
+        legend.key.height = unit(2, 'cm'),
+        legend.key.width= unit(1, 'cm'),
+        plot.margin = unit(c(0.1,0.1,0.1,0.1), "cm"))
+
+if(FALSE) { 
+  ggsave("../Figures/sources_hierarchy.png", dpi = 500, height = 8, width = 12)
+}
+
+```
+
+# HUC maps (for supplement / poster presentations only)
+```{r}
+# categories for map
+HUC.PFAS <- HUC.PFAS %>%
+  mutate(PFOA_map = case_when(
+                      PFOA <= 5 ~ "Below detection",
+                      PFOA > 5 & PFOA < 20 ~ ">5-19",
+                      PFOA >= 20 & PFOA < 100 ~ "20-99",
+                      PFOA >= 100 & PFOA <= max(PFOA) ~ "100-2500"),
+         PFOS_map = case_when(
+                      PFOS <= 5 ~ "Below detection",
+                      PFOS > 5 & PFOS < 20 ~ ">5-19",
+                      PFOS >= 20 & PFOS < 100 ~ "20-99",
+                      PFOS >= 100 & PFOS <= max(PFOS) ~ "100-1080")
+)
+
+HUC.PFAS <- HUC.PFAS %>%
+  mutate(PFOA_map = fct_relevel(PFOA_map, "Below detection", ">5-19", "20-99",
+                                "100-2500"),
+         PFOS_map = fct_relevel(PFOS_map, "Below detection", ">5-19", "20-99",
+                                "100-1080"))
+
+# transform projection for mapping
+HUC.PFAS_map <- st_transform(HUC.PFAS, crs = usmap::usmap_crs())
+
+# filtering out great lakes for clarity
+HUC.PFAS_map <- subset(HUC.PFAS_map, HUC_NAME != "Lake Superior" &
+                                     HUC_NAME != "Lake Erie" &
+                                     HUC_NAME != "Lake Huron" &
+                                     HUC_NAME != "Lake Michigan")
+
+usa <- st_as_sf(maps::map("state", fill=TRUE, plot =FALSE)) %>%
+  st_transform(crs = st_crs(HUC.PFAS_map))
+
+# clean up/trim these HUCs for mapping
+ocean.HUCs <- subset(HUC.PFAS_map, HUC_NAME == "Cape Cod")
+
+ocean.HUCs <- st_intersection(ocean.HUCs,usa)
+
+HUC.PFAS_map <- rbind(HUC.PFAS_map %>% filter(HUC_NAME != "Cape Cod"),
+                      ocean.HUCs %>% select(-ID))
+
+usmap::plot_usmap(exclude = c("AK","HI")) + 
+  geom_sf(data = HUC.PFAS_map, aes(fill = PFOA_map), size = 0.25) +
+  scale_fill_manual(values = c("grey", MetBrewer::met.brewer("Tam")), 
+                    guide = guide_legend(reverse = TRUE),
+                    name = "PFOA (ng/L)") +
+  theme(legend.text = element_text(size = 12),
+        legend.position = "right",
+        legend.key.size = unit(2,"line"),
+        legend.title = element_text(size = 15, face = "bold"))
+
+if (FALSE){
+  ggsave("../Figures/HUC_PFOA_map.png", dpi = 600)
+}
+
+usmap::plot_usmap(exclude = c("AK","HI")) + 
+  geom_sf(data = HUC.PFAS_map, aes(fill = PFOS_map), size = 0.25) +
+  scale_fill_manual(values = c("grey", MetBrewer::met.brewer("Tam")), 
+                    guide = guide_legend(reverse = TRUE),
+                    name = "PFOS (ng/L)") +
+  theme(legend.text = element_text(size = 12),
+        legend.position = "right",
+        legend.key.size = unit(2,"line"),
+        legend.title = element_text(size = 15, face = "bold"))
+
+if (FALSE) {
+  ggsave("../Figures/HUC_PFOS_map.png", dpi = 600)
+}
+
+all.counties <- st_read("../County shapefile/countyp010g.shp")
+
+centroids <- all.counties %>% 
+  st_make_valid() %>% 
+  group_by(STATE) %>% 
+  summarise(st_union(geometry)) %>% 
+  st_centroid()
+
+# catch whether HUCs are on the west coast
+HUC.PFAS_map$move.HUC <- st_intersects(HUC.PFAS_map, 
+                                       st_transform(subset(all.counties, STATE == "CA" | STATE == "CO" | STATE == "UT"), 
+                                                    crs = usmap::usmap_crs())
+                                       )
+HUC.PFAS_map$move.HUC <- unlist(lapply(HUC.PFAS_map$move.HUC, function(x) ifelse(length(x) > 0, T, F)))
+
+usmap::plot_usmap(include = c("CA","CO","UT")) + 
+  geom_sf(data = subset(HUC.PFAS_map, move.HUC == T), aes(fill = PFOA_map, color = PFOA_map), size = 0.25, alpha = 0.7) +
+  # ggsflabel::geom_sf_label_repel(data = subset(centroids, STATE == "CA" | STATE == "CO" | STATE == "UT"),
+  #                              aes(label = STATE),
+  #                              label.padding = 0.1,
+  #                              nudge_y = -10000, alpha = 0.7, size = 32) +
+  scale_fill_manual(values = c("grey", MetBrewer::met.brewer("Tam")), 
+                    guide = guide_legend(reverse = TRUE),
+                    name = "PFOA (ng/L)") +
+  scale_color_manual(values = c("grey", MetBrewer::met.brewer("Tam")), 
+                guide = guide_legend(reverse = TRUE),
+                name = "PFOA (ng/L)") +
+  theme(legend.position = "none")
+
+if (FALSE){
+  ggsave("../Figures/HUC_PFOA_map_west.png", dpi = 600)
+}
+
+usmap::plot_usmap(include = c("IN","KY","MA","MD","MI","NH","NJ","NY","OH","PA","VT","SC","IL", "WI")) + 
+  geom_sf(data = subset(HUC.PFAS_map, move.HUC == F), aes(fill = PFOA_map, color = PFOA_map), size = 0.25, alpha = 0.7) +
+  # ggsflabel::geom_sf_label_repel(data = subset(centroids, STATE == "IN" | STATE == "KY" | STATE == "MA" |
+  #                                                         STATE == "MD" | STATE == "MI" | STATE == "NH" |
+  #                                                         STATE == "NJ" | STATE == "NY" | STATE == "OH" |
+  #                                                         STATE == "PA" | STATE == "VT" | STATE == "IL" |
+  #                                                         STATE == "SC" | STATE == "WI" | STATE == "ME"),
+  #                              aes(label = STATE),
+  #                              label.padding = 0.1, segment.colour = NA,
+  #                              nudge_y = -2000, alpha = 0.7, size = 32) +
+  scale_fill_manual(values = c("grey", MetBrewer::met.brewer("Tam")), 
+                    guide = guide_legend(reverse = TRUE),
+                    name = "PFOA (ng/L)") +
+  scale_color_manual(values = c("grey", MetBrewer::met.brewer("Tam")), 
+                  guide = guide_legend(reverse = TRUE),
+                  name = "PFOA (ng/L)") +
+  theme(legend.text = element_text(size = 62, face = "bold"),
+        legend.position = "right",
+        legend.direction = "vertical",
+        legend.key.size = unit(2,"line"),
+        legend.key.width = unit(0.75, "line"),
+        legend.spacing.x = unit(0.2, 'cm'),
+        legend.spacing.y = unit(0.2, 'cm'),
+        legend.title = element_text(size = 62, face = "bold"))
+
+if (FALSE) {
+  ggsave("../Figures/HUC_PFOA_map_NE.png", dpi = 600)
+}
+
+```
+
+# Additional HUC maps (for supplement / poster presentations only)
+```{r}
+HUC.long <- HUC.PFAS_map %>% select(-contains("detect")) %>%
+  pivot_longer(cols = c("PFOA", "PFOS", "PFNA", "PFHxS", "PFBS"),
+               names_to = "Analyte",
+               values_to = "Concentration")
+
+HUC.long <- HUC.long %>%
+  mutate(PFAS_map = case_when(
+                  Concentration <= 5 ~ "Below detection",
+                  Concentration > 5 & Concentration < 20 ~ ">5-19",
+                  Concentration >= 20 & Concentration < 100 ~ "20-99",
+                  Concentration >= 100 ~ "100+")
+  )
+
+HUC.long <- HUC.long %>%
+  mutate(PFAS_map = fct_relevel(PFAS_map, "Below detection", ">5-19", "20-99","100+"))
+
+HUC.long <- subset(HUC.long, !is.na(PFAS_map))
+
+usmap::plot_usmap(exclude = c("HI", "AK")) + 
+  geom_sf(data = HUC.long %>% st_transform(crs = usmap::usmap_crs()), 
+          aes(fill = PFAS_map, color = PFAS_map), size = 0.1, alpha = 0.8) +
+  scale_fill_manual(values = c("grey", MetBrewer::met.brewer("Tam")),
+                    guide = guide_legend(reverse = F),
+                    name = "Concentration\n(ng/L)") +
+  scale_color_manual(values = c("grey", MetBrewer::met.brewer("Tam")),
+                  guide = guide_legend(reverse = F),
+                  name = "Concentration\n(ng/L)") +
+  facet_wrap(~Analyte) +
+  theme_minimal() +
+  theme(legend.text = element_text(size = 15, face = "bold"),
+        legend.position = "bottom",
+        legend.direction = "horizontal",
+        legend.key.size = unit(2,"line"),
+        legend.key.width = unit(0.75, "line"),
+        legend.spacing.x = unit(0.3, 'cm'),
+        legend.spacing.y = unit(0.3, 'cm'),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.text = element_blank(),
+        axis.title = element_blank(),
+        strip.text = element_text(size = 15, face = "bold"),
+        legend.title = element_text(size = 15, face = "bold"))
+
+if (FALSE) { 
+  ggsave("../Figures/HUC_allPFAS.png", dpi = 600, width = 14, height = 10)
+}
+
+usmap::plot_usmap(exclude = c("HI", "AK"), size = 0.5) + 
+  geom_sf(data = subset(HUC.long, Analyte == "PFOA") %>% st_transform(crs = usmap::usmap_crs()), 
+          aes(fill = PFAS_map, color = PFAS_map), size = 0.1, alpha = 0.8) +
+  scale_fill_manual(values = c("grey", MetBrewer::met.brewer("Tam")),
+                    guide = guide_legend(reverse = F),
+                    name = "Concentration\n(ng/L)") +
+  scale_color_manual(values = c("grey", MetBrewer::met.brewer("Tam")),
+                  guide = guide_legend(reverse = F),
+                  name = "Concentration\n(ng/L)") +
+  theme_minimal() +
+  theme(legend.text = element_text(size = 15, face = "bold"),
+        legend.position = "none",
+        legend.direction = "horizontal",
+        legend.key.size = unit(2,"line"),
+        legend.key.width = unit(0.75, "line"),
+        legend.spacing.x = unit(0.3, 'cm'),
+        legend.spacing.y = unit(0.3, 'cm'),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.text = element_blank(),
+        axis.title = element_blank(),
+        strip.text = element_text(size = 15, face = "bold"),
+        legend.title = element_text(size = 15, face = "bold"))
+
+if (FALSE) {
+  ggsave("../Figures/abstract_img1.png", dpi = 600)
+}
+
+```
+
+# sources and demographics figure
+```{r, warning=FALSE, message=TRUE}
+source("1b_Sources and demographics.R")
+
+all.sources_models <- all.sources_models %>% 
+    mutate(dep.var.name = case_when(dep.var == "percHisp" ~ "% Hispanic/Latino\nresidents",
+                                    dep.var == "percBlack" ~ "% non-Hispanic Black\nresidents",
+                                    dep.var == "poverty" ~ "% residents under\npoverty line",
+                                    TRUE ~ as.character(NA)),
+           dep.var.name2 = case_when(dep.var == "percHisp" ~ "Hispanic/Latino\nresidents",
+                                     dep.var == "percBlack" ~ "Non-Hispanic Black\nresidents",
+                                     dep.var == "poverty" ~ "Residents under the\nfederal poverty line",
+                                     TRUE ~ as.character(NA)),
+           outcome.name = case_when(outcome == "any_airport" ~ "Airports (≥ 1)",
+                                    outcome == "any_industry" ~ "Major industrial facilities (≥ 1)",
+                                    outcome == "any_MFTA" ~ "MFTA (≥ 1)",
+                                    outcome == "landfill_median" ~ "Landfills (> median count)",
+                                    outcome == "WWTP_flow.median" ~ "WWTP effluent (> median)",
+                                    TRUE ~ as.character(NA)),
+           p.value.plot = as.numeric(ifelse(p.value == "<0.001", 0.001, p.value)),
+           stars.plot = ifelse(p.value.plot < 0.01, "***", 
+                               ifelse(p.value.plot < 0.05, "**",
+                                      ifelse(p.value.plot < 0.1, "*", ""))),
+                    image = case_when(outcome == "any_industry" ~ img[2],
+                                      outcome == "WWTP_flow.median" ~ img[5],
+                                      outcome == "any_MFTA" ~ img[4],
+                                      outcome == "any_airport" ~ img[1],
+                                      outcome == "landfill_median" ~ img[3],
+                                      TRUE ~ as.character(NA))
+    )
+           
+ggplot(all.sources_models, aes(x = OR, y = dep.var.name2, 
+                               group = outcome.name)) +
+    geom_point(aes(color = outcome.name), size = 1.5, position = position_dodge(width = 0.9)) +
+    geom_errorbar(aes(xmin = LCI.OR, xmax = UCI.OR, color = outcome.name), 
+                  width = 0, size = 1, position = position_dodge(width = 0.9)) + 
+    scale_color_manual(values = MetBrewer::met.brewer(name = "Juarez", n = 5),
+                       name = "PFAS source") +
+    geom_text(aes(label = paste(format(round(OR, digits = 2), nsmall = 2), 
+                               " [", format(round(LCI.OR, digits = 2), nsmall = 2), ", ", 
+                               format(round(UCI.OR, digits = 2), nsmall = 2), "]", sep = ""),
+                  group = outcome.name),
+             size = 4,     position = position_dodge(0.9), vjust = -1) +
+    geom_vline(xintercept = 1, color = "grey", linetype = "dotted") +
+    labs(x = "", y = "",
+         subtitle = "Odds ratios [95% CI] corresponding to one-percentage-point increases\nin each sociodemographic factor") +
+    theme_bw() +
+    theme(panel.grid.minor.x = element_blank(), 
+          panel.grid.major.x = element_blank(),
+          strip.background = element_rect(fill = "white"),
+          plot.subtitle = element_text(size = 12),
+          strip.text = element_text(size = 14, color = "black"),
+          panel.spacing = unit(2, "lines"),
+          axis.text = element_text(size = 12, color = "black"),
+          axis.title = element_text(size = 14, color = "black"),
+          legend.text = element_text(size = 12, color = "black"),
+          legend.title = element_text(size = 14, color = "black"),
+          plot.margin = unit(c(0.1,0.1,0.1,0.1), "cm"))
+
+if (FALSE) {
+  ggsave("../Figures/sources_ORs.png", dpi = 500, height = 8, width = 10)
+}
+
+```
+
+# demographics and PFAS regression results
+```{r}
+source("1c_PFAS-demo modelling.R")
+source("1d_Secondary analysis modelling.R")
+
+# ready results before printing tables
+PFAS_models_partial <- PFAS_models_partial %>%
+  mutate(outcome_clean = case_when(outcome == "PFOA_detect" ~ "PFOA (partial)",
+                                   outcome == "PFOS_detect" ~ "PFOS (partial)",
+                                   outcome == "PFNA_detect" ~ "PFNA (partial)",
+                                   outcome == "PFHxS_detect" ~ "PFHxS (partial)",
+                                   outcome == "PFBS_detect" ~ "PFBS (partial)",
+                                   outcome == "Any_detect" ~ "Any (partial)"),
+         depvar_clean = case_when(dep.var == "percHisp" ~ "% Hispanic",
+                                  dep.var == "percBlack" ~ "% Black",
+                                  dep.var == "poverty" ~ "% poverty"),
+         full.CI = paste("(", LCI, ", ", UCI, ")", sep = "")
+         )
+
+PFAS_models_fully <- PFAS_models_fully %>%
+  mutate(outcome_clean = case_when(outcome == "PFOA_detect" ~ "PFOA (fully)",
+                                   outcome == "PFOS_detect" ~ "PFOS (fully)",
+                                   outcome == "PFNA_detect" ~ "PFNA (fully)",
+                                   outcome == "PFHxS_detect" ~ "PFHxS (fully)",
+                                   outcome == "PFBS_detect" ~ "PFBS (fully)",
+                                   outcome == "Any_detect" ~ "Any (fully)"),
+         depvar_clean = case_when(dep.var == "percHisp" ~ "% Hispanic",
+                                  dep.var == "percBlack" ~ "% Black",
+                                  dep.var == "poverty" ~ "% poverty"),
+         full.CI = paste("(", LCI, ", ", UCI, ")", sep = "")
+         )
+
+PFAS_models_fully <- PFAS_models_fully %>%
+  filter(dep.var == "percHisp" | dep.var == "percBlack" | dep.var == "poverty")
+  
+all_detect_models <- rbind(PFAS_models_partial, PFAS_models_fully)
+
+secondary.results <- secondary.results %>%
+  filter(dep.var == "percHisp" | dep.var == "percBlack" | dep.var == "poverty")
+
+secondary.results <- secondary.results %>%
+  mutate(depvar_clean = case_when(dep.var == "percHisp" ~ "% Hispanic",
+                                  dep.var == "percBlack" ~ "% Black",
+                                  dep.var == "poverty" ~ "% poverty"),
+         full.CI = paste("(", LCI, ", ", UCI, ")", sep = "")
+         )
+
+MCL_models_partial <- MCL_models_partial %>%
+  mutate(outcome_clean = case_when(outcome == "above_PFOA_reg" ~ "PFOA (10 ng/L) [partial]",
+                                   outcome == "above_PFOS_reg" ~ "PFOS (6 ng/L) [partial]",
+                                   outcome == "above_any_reg" ~ "One or more MCL [partial]"),
+         depvar_clean = case_when(dep.var == "percHisp" ~ "% Hispanic",
+                                  dep.var == "percBlack" ~ "% Black",
+                                  dep.var == "poverty" ~ "% poverty"),
+         full.CI = paste("(", LCI, ", ", UCI, ")", sep = "")
+         )
+
+MCL_models_fully <- MCL_models_fully %>%
+  mutate(outcome_clean = case_when(outcome == "above_PFOA_reg" ~ "PFOA (10 ng/L) [fully]",
+                                   outcome == "above_PFOS_reg" ~ "PFOS (6 ng/L) [fully]",
+                                   outcome == "above_any_reg" ~ "One or more MCL [fully]"),
+         depvar_clean = case_when(dep.var == "percHisp" ~ "% Hispanic",
+                                  dep.var == "percBlack" ~ "% Black",
+                                  dep.var == "poverty" ~ "% poverty"),
+         full.CI = paste("(", LCI, ", ", UCI, ")", sep = "")
+         )
+
+MCL_models_fully <- MCL_models_fully %>%
+  filter(dep.var == "percHisp" | dep.var == "percBlack" | dep.var == "poverty")
+
+all_MCL_models <- rbind(MCL_models_partial, MCL_models_fully)
+
+# Table 2 
+knitr::kable(all_detect_models %>% 
+               filter(outcome == "PFOA_detect" | 
+                      outcome == "PFOS_detect" | 
+                      outcome == "Any_detect") %>%
+               select(outcome_clean, depvar_clean, percent.change, full.CI, n.obs),
+             label = "Table 2")
+
+knitr::kable(secondary.results %>% 
+               filter(outcome == "PFOA_detect" | 
+                      outcome == "PFOS_detect" | 
+                      outcome == "Any_detect") %>%
+               select(type, outcome, depvar_clean, percent.change, full.CI, n.obs),
+             label = "Table 2")
+ 
+# supplemental table       
+knitr::kable(all_detect_models %>%
+               select(outcome_clean, depvar_clean, percent.change, full.CI, n.obs),
+             label = "Supplemental (I)") 
+
+knitr::kable(all_MCL_models %>%
+               select(outcome_clean, depvar_clean, percent.change, full.CI, n.obs),
+             label = "Supplemental (II)") 
+
+```
+
+
+# Detection limit table
+```{r}
+DLs.table <- read.csv("../Merged PFAS data/DL_table.csv")
+
+print(DLs.table)
+
+DLs <- dat %>% 
+  select(ends_with("DL"), -PFHpA_DL) %>%
+  pivot_longer(cols = c(ends_with("DL")), names_to = "Compound",
+               values_to = "DL")
+
+# how many samples are from the final set of CWS?
+nrow(dat[dat$PWSID %in% CWS_FN$PWSID, ])
+
+DLs <- DLs %>% filter(Compound != "PFBA_DL")
+
+DLs$Compound <- str_replace(string = DLs$Compound, pattern = "_DL", replacement = "")
+
+vlines <- DLs.table[, c(2:4, 6)] %>% 
+  rename("98th-pctile" = "X98th..tile",
+         "Minimum DL" = "Minimum") %>%
+  pivot_longer(cols = c("Minimum DL", Median, "98th-pctile"), names_to = "Statistic", values_to = "Conc")
+
+
+LHAs <- data.frame(Compound = unique(DLs$Compound),
+                   Conc = c(0.004, 0.02, NA, NA, NA),
+                   Statistic = rep("Interim LHA", 5)
+                   )
+
+vlines <- rbind(vlines, LHAs)
+
+ggplot(DLs, aes(x=DL, color = Compound, fill=Compound)) +
+  scale_fill_manual(values = MetBrewer::met.brewer(name = "Johnson", n = 5)) +
+  scale_color_manual(values = MetBrewer::met.brewer(name = "Johnson", n = 5)) +
+  scale_y_continuous(labels = function(x) {paste(x/1000, "k", sep="")}) +
+  geom_histogram(alpha=0.6, binwidth = 0.25) +
+  geom_vline(data = vlines, aes(xintercept = Conc), linetype = "dashed", size = 0.5) +
+  ggrepel::geom_label_repel(data = vlines, aes(label = Statistic, x = Conc, y = 15000), 
+                            fill = "white", size = 3, color = "black",
+                            segment.linetype = 6, seed = 10) +
+   scale_x_log10(breaks = scales::trans_breaks("log10", function(x) 10^x),
+              labels = scales::trans_format("log10", scales::math_format(10^.x))) +
+  theme_bw() +
+  theme(
+    legend.position="none",
+    panel.spacing = unit(0.6, "lines"),
+    strip.text.x = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 10),
+    axis.title = element_text(size = 12, face = "bold")
+  ) +
+  xlab("Concentration [ng/L]") + ylab("# of samples") +
+  facet_wrap(~Compound)
+
+if (FALSE){ 
+  ggsave("../Figures/DL_graph.png", dpi = 500, width = 7, height = 5)
+}
+
+```
+
+# Mapping data coverage (in terms of counties served)
+```{r, fig.height=6, fig.width=10, echo=FALSE}
+library(usmap)
+
+# state county geometries from usmap
+state.counties <- plot_usmap(regions = "counties", exclude = c("AK", "HI"))
+state.counties$data$county <- str_replace(string = state.counties$data$county,
+                                          pattern = " County", 
+                                          replacement = "")
+state.counties$data$state_county <- paste(tolower(state.counties$data$abbr), 
+                                          tolower(state.counties$data$county), 
+                                          sep = "_")
+
+# create exists indicator (for CWS data)
+CWS.counties <- tibble(abbr = CWS_FN$State, state_county = CWS_FN$state_county)
+CWS.counties <- CWS.counties[!duplicated(CWS.counties),]
+
+state.counties$data$match <- ifelse(state.counties$data$state_county %in% 
+                                    CWS.counties$state_county, 
+                                    "Included in analysis", "No data")
+
+
+# plot
+state.counties +
+  geom_polygon(aes(x = x, y = y, group = group, fill = match), color = "white",
+               size = 0.1) +
+  scale_fill_manual(name = "", 
+                    values = c("Included in analysis" = "darkblue", 
+                               "No data" = "darkgrey")) +
+  theme(panel.background = element_rect(color = "white", fill = "white"),
+        legend.key.size = unit(0.5, 'cm'),
+        legend.title = element_text(size = 18),
+        legend.text = element_text(size = 13),
+        legend.position = "bottom",
+        legend.justification = 0.5)
+
+if (FALSE) {
+  ggsave("../Figures/Study_coverage.png", dpi = 600)
+}
+
+```
+
+# abstract art formulation
+```{r}
+# abstract art formulation
+# PFAS_outcomes <- read.csv("../Merged PFAS data/Results/abstract_art_results.csv")
+# sources_outcomes <- subset(all.sources_models, grepl("any", outcome))
+
+ggplot(all.sources_models %>% filter(grepl("any", outcome)), 
+       aes(y = n.obs, x = outcome, 
+           group = coefficient.order)) +
+  ggimage::geom_image(aes(image = image), size = 0.09, position = position_stack(vjust = -0.2)) +
+  geom_bar(aes(fill = percent.change, color = percent.change), 
+            stat = "identity") +
+  scale_fill_gradient2(breaks = c(-10, 0, 10),
+                       limits = c(-11, 11),
+                       labels =  scales::percent(c(-10/100, 0/100, 10/100), 
+                                                accuracy = 1),
+                       name = "Change in odds\nof sharing a watershed\nwith a PFAS source", 
+                       low = MetBrewer::met.brewer("Benedictus", n = 10)[10], 
+                       high = MetBrewer::met.brewer("Benedictus", n = 10)[1],
+                       guide = guide_colorbar(frame.colour = "black", ticks.colour = "white", ticks.linewidth = 2)) +  
+  scale_color_gradient2(breaks = c(-10, 0, 10),
+                        limits = c(-11, 11),
+                        labels =  scales::percent(c(-10/100, 0/100, 10/100), 
+                                               accuracy = 1),
+                        name = "Change in odds\nof sharing a watershed\nwith a PFAS source",
+                        low = MetBrewer::met.brewer("Benedictus", n = 10)[10], 
+                        high = MetBrewer::met.brewer("Benedictus", n = 10)[1],
+                        guide = guide_colorbar(frame.colour = "black", ticks.colour = "white", ticks.linewidth = 2)) +  
+  labs(y = "", x = "") +
+  theme_void() +
+  theme(axis.text.y = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.y = element_text(face = "bold", size = 22, angle = 90,
+                                    margin = margin(t = 0, r = 10, b = 0, l = 0)),
+        legend.text = element_text(size = 15, face = "bold"),
+        legend.title = element_text(size = 18, face = "bold"),
+        legend.key.height = unit(2, 'cm'),
+        legend.key.width= unit(1, 'cm'),
+        plot.margin = unit(c(0.1,0.1,0.1,0.1), "cm")
+  ) +
+  guides(fill = guide_colorbar(ticks.colour = NA),
+         color = guide_colorbar(ticks.colour = NA))
+
+if (FALSE){
+  ggsave("../Figures/abstract art/art.png", dpi = 500, height = 6, width = 9)
+}
+```
+
