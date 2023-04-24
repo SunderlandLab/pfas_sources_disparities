@@ -11,7 +11,7 @@ Files are numbered according to the order in which they were run for analysis an
 - **1a_HUC processing and modelling.R**: arrange watershed data by aggregating the community water system data; spatial error regressions with watershed data
 - **1b_Sources and demographics.R**: logistic regressions estimating the association between sociodemographic factors and the presence of sources in watersheds of CWS
 - **1c_PFAS-demo modelling.R**: logistic regressions estimating the association between sociodemographic factors and PFAS detections (>5 ng/L) and detections above the lowest state-level MCL in CWS
-- **1d_Secondary analysis modelling.R**: secondary analyses, including analyses stratified by urban/rural classification 
+- **1d_Secondary + sensitivity analysis modelling.R**: secondary analyses, including analyses stratified by urban/rural classification 
 
 Additional secondary analyses are also available in the sub-folder ("Additional secondary analyses"). They include analyses incorporating additional area-level measures of racial/ethnic composition and socioeconomic status.
 
