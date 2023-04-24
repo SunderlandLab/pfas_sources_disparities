@@ -1,5 +1,5 @@
 # ---
-# title: 3b_Sources and demographics_secondary
+# title: Sources and demographics_secondary
 # author: Jahred Liddie
 # purpose: regression modeling of relationships between sociodemographic factors (of communities served)
 # and contamination sources; this includes additional county-level race/ethnicity and SES variables
@@ -47,7 +47,7 @@ var(CWS_FN$percAmind) / var(CWS_FN$percHisp) *100
 var(CWS_FN$percAPI) / var(CWS_FN$percBlack) *100
 var(CWS_FN$percAPI) / var(CWS_FN$percHisp) *100
 
-# how many sum to 100% when including all of these three?
+# check prior to modeling: how many sum to 100% when including all of these 4?
 CWS_FN <- CWS_FN %>% 
   rowwise() %>%
   mutate(flag_sum = sum(percAmind + percBlack + percAPI + percHisp))

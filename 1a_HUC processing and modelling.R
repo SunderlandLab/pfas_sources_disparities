@@ -1,5 +1,5 @@
 # ---
-# title: 3a_HUC processing and modelling
+# title: HUC processing and modelling
 # author: Jahred Liddie
 # purpose: data processing; regression modeling of relationships between contamination sources and 
   # PFAS concentrations in 8-digit HUCs
@@ -240,17 +240,19 @@ st_drop_geometry(HUC.PFAS) %>%
                    ~sum(.x))
             )
 
+# these groups refer to CWS with source water in multiple HUCs
+HUC.PFAS <- subset(HUC.PFAS, !st_is_empty(geometry))
+
 if (FALSE){
 st_write(HUC.PFAS,
          delete_dsn = TRUE,
          "../Merged PFAS data/HUCs_for_analysis.geojson")
 }
 
-
 ################################################################################
 # Regression modelling
 ################################################################################
-# first a linear reg as a test for autocorrelation
+# first a linear reg as a test for autocorrelation (this drops nothing)
 test_dat <- subset(HUC.PFAS, !is.na(PFOA) & !st_is_empty(geometry))
 
 m1a <- lm(logPFOA ~ MFTA_count + airport_count + industries_count + WWTP_count,
@@ -273,7 +275,6 @@ m1a <- errorsarlm(logPFOA ~ MFTA_count + airport_count + industries_count + WWTP
                  listw = lw, zero.policy = T, 
                  data = test_dat)
 
-HUC.PFAS <- subset(HUC.PFAS, !st_is_empty(geometry))
 # mark those without neighbors
 HUC.PFAS$noneigh <- card(nb) == 0L
 
@@ -286,7 +287,6 @@ HUC.PFAS$noneigh <- card(nb) == 0L
 
 # now let's cycle through all the outcomes
 PFAS.vars <- c("logPFOA", "logPFOS", "logPFNA", "logPFBS", "logPFHxS")
-f1 <- "~ MFTA_count + airport_count + industries_count + WWTP_count" # first formula
 
 # this function runs and extracts model output
 spatial_model.f <- function(PFAS.outcome = NULL, model.formula = NULL, exclude.NDs = NULL, exclude.zeros = NULL) {
@@ -358,13 +358,15 @@ spatial_model.f <- function(PFAS.outcome = NULL, model.formula = NULL, exclude.N
 # f3 <-  "~ MFTA_count + airport_count + industries_count + WWTP_count + landfill.LMOP_count"
 f1 <-  "~ MFTA_count + airport_count + industries_count + WWTP_logflow + landfill.LMOP_count"
 f2 <-  "~ MFTA_count + airport_count + industries_count + WWTP_logflow"
+f3 <- "~ MFTA_count + airport_count + industries_count + WWTP_count" # identical model to Hu et al., 2016
 
-# main mdoel: with WWTP_logflow and landfill_count
+# main model: with WWTP_logflow and landfill_count
 HUC_main.models <- map_dfr(PFAS.vars, ~spatial_model.f(.x, model.formula = f1, exclude.NDs = FALSE, exclude.zeros = FALSE))
 HUC_sens <- map_dfr(PFAS.vars, ~spatial_model.f(.x, model.formula = f1, exclude.NDs = FALSE, exclude.zeros = TRUE))
-HUC_nolandfills <- map_dfr(PFAS.vars, ~spatial_model.f(.x, model.formula = f2, exclude.NDs = FALSE, exclude.zeros = FALSE)) # most comparable to Hu et al., 2016
+HUC_nolandfills <- map_dfr(PFAS.vars, ~spatial_model.f(.x, model.formula = f2, exclude.NDs = FALSE, exclude.zeros = FALSE)) # more similar to Hu et al., 2016
+HUC_replicate <- map_dfr(PFAS.vars, ~spatial_model.f(.x, model.formula = f3, exclude.NDs = FALSE, exclude.zeros = FALSE)) # most similar to Hu et al., 2016
 
-# note that excluding HUCs w/o neighbors doesn't change coeffcients much
+# note that excluding HUCs w/o neighbors doesn't change coefficients much
 # (compare HUC_main.models to HUC_sens)
 
 HUC_main.models <- HUC_main.models %>%
@@ -391,7 +393,7 @@ HUC_exclude.NDs <- HUC_exclude.NDs %>%
   ungroup()
 
 ################################################################################
-# model checking to evaluate if using NDs matters for regression assumptions
+# model checking to evaluate if using full NDs matters for regression assumptions
 # this function runs and extracts model residuals, etc
 check_model.f <- function(PFAS.outcome = NULL, model.formula = NULL, exclude.NDs = NULL) {
   
@@ -432,78 +434,6 @@ check_model.f <- function(PFAS.outcome = NULL, model.formula = NULL, exclude.NDs
   return(model.check)
 }
 
-# bind all checks
-all_check <- map_dfr(PFAS.vars, 
-                     ~check_model.f(.x, model.formula = f1, exclude.NDs = FALSE)
-                     )
-
-# heteroskedasticity; note: PFNA model excluded
-  ggplot(all_check, aes(color = outcome.name, y = residual, x = prediction)) +
-    geom_point(size = 0.75) +
-    geom_smooth(method = "lm") +
-    geom_hline(yintercept = 0, color = "darkgrey", linetype = "dotted", size = 1) +
-    scale_color_manual(values = MetBrewer::met.brewer(name = "Johnson", n = 5)) +
-    labs(x = "Predictions", y = "Residuals") +
-    facet_wrap(~outcome.name) +
-    theme_minimal() +
-    theme(legend.position = "none")
-  
-  if (FALSE) {
-    ggsave("../Figures/HUC check/heteroskedasticity_all.png", dpi = 400, height = 5, width = 6, bg = "white")
-  }
-  
-  # ZCM assumption
-  ggplot(all_check, aes(color = outcome.name, y = residual, x = var)) +
-    geom_point(size = 0.75) +
-    geom_smooth(method = "lm") +
-    geom_hline(yintercept = 0, color = "darkgrey", linetype = "dotted", size = 1) +
-    scale_color_manual(values = MetBrewer::met.brewer(name = "Johnson", n = 5)) +
-    labs(x = "Predictions", y = "Residuals") +
-    facet_wrap(~outcome.name) +
-    theme_minimal() +
-    theme(legend.position = "none")
-  
-  # normality of residuals 
-  ggplot(all_check %>% filter(outcome.name != "log(PFNA)"), aes(fill = outcome.name, x = residual)) +
-    geom_histogram(color = "black") +
-    scale_fill_manual(values = MetBrewer::met.brewer(name = "Johnson", n = 5)) +
-    labs(x = "Residuals", y = "Count") +
-    facet_wrap(~outcome.name) +
-    theme_minimal() +
-    theme(legend.position = "none")
-  
-  if (FALSE) {
-    ggsave("../Figures/HUC check/residuals_all.png", dpi = 400, height = 5, width = 6, bg = "white")
-  }
-  
-  detect_check <- map_dfr(PFAS.vars, 
-                       ~check_model.f(.x, model.formula = f1, exclude.NDs = TRUE)
-  )
-  
-  ggplot(detect_check, aes(color = outcome.name, y = residual, x = prediction)) +
-    geom_point(size = 0.75) +
-    geom_smooth(method = "lm") +
-    geom_hline(yintercept = 0, color = "darkgrey", linetype = "dotted", size = 1) +
-    scale_color_manual(values = MetBrewer::met.brewer(name = "Johnson", n = 5)) +
-    labs(x = "Predictions", y = "Residuals") +
-    facet_wrap(~outcome.name) +
-    theme_minimal() +
-    theme(legend.position = "none")
-  
-  ggsave("../Figures/HUC check/heteroskedasticity_detects.png", dpi = 400, height = 5, width = 6, bg = "white")
-  
-  ggplot(detect_check %>% filter(outcome.name != "log(PFNA)"), aes(fill = outcome.name, x = residual)) +
-    geom_histogram(color = "black") +
-    scale_fill_manual(values = MetBrewer::met.brewer(name = "Johnson", n = 5)) +
-    labs(x = "Residuals", y = "Count") +
-    facet_wrap(~outcome.name) +
-    theme_minimal() +
-    theme(legend.position = "none")
-  
-  if (FALSE) {
-    ggsave("../Figures/HUC check/residuals_detects.png", dpi = 400, height = 5, width = 6, bg = "white")
-  }
-  
   # comparing all estimates
   all.estimates <- rbind(HUC_main.models %>% mutate(dataset = "Includes NDs (substitution)"), 
                          HUC_exclude.NDs)
@@ -541,5 +471,7 @@ all_check <- map_dfr(PFAS.vars,
   if (FALSE) {
     ggsave("../Figures/HUC check/estimates_comparison.png", dpi = 400, height = 8, width = 10, bg = "white")
     write.csv(all.estimates, "../Regressions/HUC_model_results.csv")
+    write.csv(HUC_replicate, "../Regressions/HUC_model_results_forcomparison.csv")
+    write.csv(HUC_replicate_ENDs, "../Regressions/HUC_model_results_forcomparison_ENDs.csv")
   }
   

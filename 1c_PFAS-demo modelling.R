@@ -1,5 +1,5 @@
 # ---
-# title: 3c_PFAS-demo modelling
+# title: PFAS-demo modelling
 # author: Jahred Liddie
 # purpose: regression modeling of relationships between sociodemographic factors (of communities served)
 # and PFAS contamination of drinking water
@@ -103,6 +103,8 @@ MCL.vars <- c("above_PFOA_reg", "above_PFOS_reg", "above_any_reg")
 f1 <- "~ percHisp + percBlack + poverty + State" # first formula
 f2 <- "~ percHisp + percBlack + poverty + State + any_airport + any_MFTA + 
          WWTP_logflow + any_industry + landfill.LMOP_count + GW_SW + PWS_size_tri + treatment" # second formula
+f3 <- "~ percHisp + percBlack + poverty + State + airport_count + MFTA_count + 
+         WWTP_logflow + industries_count + landfill.LMOP_count + GW_SW + PWS_size_tri + treatment" # second formula
 
 # this function runs and extracts model output
 PFAS_model.f <- function(PFAS.outcome = NULL, model.formula = NULL, dataset = NULL) {
@@ -155,6 +157,11 @@ PFAS_models_fully <- map_dfr(PFAS.vars, ~PFAS_model.f(.x, model.formula = f2, da
 MCL_models_partial <- map_dfr(MCL.vars, ~PFAS_model.f(.x, model.formula = f1, dataset = CWS_FN))
 
 MCL_models_fully <- map_dfr(MCL.vars, ~PFAS_model.f(.x, model.formula = f2, dataset = CWS_FN))
+
+# note that these models are nearly identical in estimates for primary variables, 
+# so these more detailed specification choices don't matter substantially:
+PFAS_models_fully2 <- map_dfr(PFAS.vars, ~PFAS_model.f(.x, model.formula = f3, dataset = CWS_FN))
+MCL_models_fully2 <- map_dfr(MCL.vars, ~PFAS_model.f(.x, model.formula = f3, dataset = CWS_FN))
 
 ################################################################################
 #### Sensitivity analysis:

@@ -1,5 +1,5 @@
 # ---
-# title: 3b_Sources and demographics
+# title: Sources and demographics
 # author: Jahred Liddie
 # purpose: regression modeling of relationships between sociodemographic factors (of communities served)
   # and contamination sources

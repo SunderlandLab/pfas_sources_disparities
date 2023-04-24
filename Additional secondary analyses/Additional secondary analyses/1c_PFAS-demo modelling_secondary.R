@@ -1,5 +1,5 @@
 # ---
-# title: 3c_PFAS-demo modelling_secondary
+# title: PFAS-demo modelling_secondary
 # author: Jahred Liddie
 # purpose: regression modeling of relationships between sociodemographic factors (of communities served)
 # and PFAS contamination of drinking water; this includes additional county-level race/ethnicity & SES variables

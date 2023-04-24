@@ -3,6 +3,8 @@ title: "Figure tables"
 author: "Jahred Liddie"
 output:
   word_document: default
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
@@ -49,10 +51,7 @@ summary_stats <-
             ">= 1 airport in HUC" = ~n_perc(any_airport=="One or more", na_rm = T, digits = 1),
             ">= 1 MFTA in HUC" = ~n_perc(any_MFTA=="One or more", na_rm=T, digits = 1),
             "Total existing effluent in HUC [Mgal/day]" = ~mean_sd(WWTP_existingtotalflow_Mgal.d, digits = 1),
-            "Total existing effluent per area [Mgal/mi2-day]" = ~mean_sd(WWTP_existingtotalflow_Mgal.d.sqmi, digits = 1),
             "Number of landfills in HUC" = ~mean_sd(landfill.LMOP_count, digits = 1),
-            "Systems with recommended PFAS treatment" = ~n_perc(treatment, na_rm = T, digits = 1),
-            "Mean number of total measurements" = ~mean_sd(all_measurements, digits = 1),
             "Ever detect of PFOA" = ~n_perc(PFOA_detect, na_rm = T, digits = 1),
             "Ever detect of PFOS" = ~n_perc(PFOS_detect, na_rm = T, digits = 1),
             "Ever detect of PFNA" = ~n_perc(PFNA_detect, na_rm = T, digits = 1),
@@ -63,8 +62,7 @@ summary_stats <-
             "Ever exceedance of NY PFOS MCL (10 ng/L)" = ~n_perc(above_PFOS_reg, na_rm=T, digits = 1),
             "Ever exceedance of MI PFNA MCL (6 ng/L)" = ~n_perc(above_PFNA_reg, na_rm = T, digits = 1),
             "Ever exceedance of NH PFHxS MCL (18 ng/L)" = ~n_perc(above_PFHxS_reg, na_rm = T, digits = 1),
-            "Ever exceedance of MI PFBS MCL (420 ng/L)" = ~n_perc(above_PFBS_reg, na_rm = T, digits = 1),
-            "Ever exceedance of EPA LHA" = ~n_perc(above_EPA_LHA, na_rm=T, digits = 1)))
+            "Ever exceedance of MI PFBS MCL (420 ng/L)" = ~n_perc(above_PFBS_reg, na_rm = T, digits = 1)))
 
 qwraps2::summary_table(CWS_FN, summary_stats)
 # qwraps2::summary_table(CWS_RW, summary_stats)
@@ -83,6 +81,7 @@ pop_table <-
   list("Outcome measures" =
        list("Ever detect of PFOA" = ~n_perc(PFOA_detect, na_rm = T),
             "Ever detect of PFOS" = ~n_perc(PFOS_detect, na_rm = T),
+            "Ever detect of PFOA or PFOS" = ~n_perc(PFOA_PFOS_detect, na_rm = T),
             "Ever detect of PFNA" = ~n_perc(PFNA_detect, na_rm = T),
             "Ever detect of PFHxS" = ~n_perc(PFHxS_detect, na_rm = T),
             "Ever detect of PFBS" = ~n_perc(PFBS_detect, na_rm=T),
@@ -104,6 +103,8 @@ pop_table <-
              "Ever detect of PFHxS" = ~round(sum(ifelse(PFHxS_detect==1,
                                             population_served, 0), na.rm = T)/10^6, 1),
              "Ever detect of PFBS" = ~round(sum(ifelse(PFBS_detect==1,
+                                            population_served, 0), na.rm = T)/10^6, 1),
+             "Ever detect of PFOA or PFOS" = ~round(sum(ifelse(PFOA_PFOS_detect==1,
                                             population_served, 0), na.rm = T)/10^6, 1),
              "Ever detect of five PFAS" = ~round(sum(ifelse(Any_detect==1,
                                                  population_served, 0), na.rm = T)/10^6, 1),
@@ -139,6 +140,10 @@ CWS_FN$above_any_reg <- with(data = CWS_FN,
                                     !is.na(above_PFBS_reg),
                                     0, NA)))
 
+CWS_FN$PFOA_PFOS_detect <- ifelse(CWS_FN$PFOA_detect > 0 | CWS_FN$PFOS_detect > 0 &
+                                  !is.na(CWS_FN$PFOA_detect) & !is.na(CWS_FN$PFOS_detect),
+                                   1, 0)
+  
 qwraps2::summary_table(CWS_FN, pop_table)
 # qwraps2::summary_table(CWS_RW, pop_table)
 
@@ -157,6 +162,7 @@ SDWIS <- SDWIS %>% dplyr::select(WATER_SYSTEM.PWSID, WATER_SYSTEM.PWS_NAME,
                                  WATER_SYSTEM.ADDRESS_LINE1,
                                  WATER_SYSTEM.ADDRESS_LINE2,
                                  WATER_SYSTEM.GW_SW_CODE, 
+                                 WATER_SYSTEM.PWS_ACTIVITY_CODE,
                                  WATER_SYSTEM.POPULATION_SERVED_COUNT,
                                  WATER_SYSTEM.PRIMARY_SOURCE_CODE, 
                                  WATER_SYSTEM.CITIES_SERVED,
@@ -168,6 +174,7 @@ SDWIS <- SDWIS %>% dplyr::select(WATER_SYSTEM.PWSID, WATER_SYSTEM.PWS_NAME,
                 PWS_type = WATER_SYSTEM.PWS_TYPE_CODE,
                 System_addressL1 = WATER_SYSTEM.ADDRESS_LINE1,
                 System_addressL2 = WATER_SYSTEM.ADDRESS_LINE2,
+                Activity_code = WATER_SYSTEM.PWS_ACTIVITY_CODE,
                 System_city = WATER_SYSTEM.CITY_NAME,
                 Zip_code = WATER_SYSTEM.ZIP_CODE,
                 GW_SW = WATER_SYSTEM.GW_SW_CODE,
@@ -177,7 +184,7 @@ SDWIS <- SDWIS %>% dplyr::select(WATER_SYSTEM.PWSID, WATER_SYSTEM.PWS_NAME,
                 counties_served = WATER_SYSTEM.COUNTIES_SERVED,
                 connections = WATER_SYSTEM.SERVICE_CONNECTIONS_COUNT)
 
-# SDWIS with all states and 
+# SDWIS with all states that are active as of this SDWIS pull
 SDWIS <- SDWIS %>%
   mutate(PWS_size = ifelse(population_served <= 500, "Very Small", 
                            ifelse(population_served <= 3300, "Small", 
@@ -186,11 +193,10 @@ SDWIS <- SDWIS %>%
            PWS_size_tri = ifelse(population_served <=3300, "Small or very small",
                                  ifelse(population_served <= 10000, "Medium", "Large or very large")))
 
-SDWIS <- SDWIS %>% filter(PWS_type == "CWS")
+SDWIS <- SDWIS %>% filter(PWS_type == "CWS" & Activity_code == "A")
 
 # just states included in this study
 SDWIS_states <- SDWIS %>% filter(grepl(paste(states, collapse="|"), PWSID))
-SDWIS_states <- SDWIS_states %>% filter(PWS_type == "CWS")
 
 SDWIS_comparison <-
   list("Table 1" =
@@ -198,7 +204,8 @@ SDWIS_comparison <-
          "Number of large or very large systems" = ~n_perc(PWS_size_tri == "Large or very large", na_rm=T, digits = 1),
             "Number of medium" = ~n_perc(PWS_size_tri == "Medium", na_rm=T, digits = 1),
             "Number of small or very small systems" = ~n_perc(PWS_size_tri == "Small or very small", na_rm=T, digits = 1),
-            "Number of systems with SW" = ~n_perc(GW_SW == "SW", na_rm = T, digits = 1))
+            "Number of systems with SW" = ~n_perc(GW_SW == "SW", na_rm = T, digits = 1),
+            "Total population served [millions]" = ~round(sum(population_served)/1000000, 1))
        )
 
 qwraps2::summary_table(SDWIS, SDWIS_comparison)
@@ -207,7 +214,6 @@ qwraps2::summary_table(CWS_FN, SDWIS_comparison)
 qwraps2::summary_table(ucmr, SDWIS_comparison)
 
 ```
-
 
 
 # T-tests comparing county-served populations with/without detects + MCL exceedances (supplement)
@@ -540,7 +546,7 @@ knitr::kable(t.test_HUC2[order(t.test_HUC2$PFAS.vars,
                                t.test_HUC2$contam.vars),])
 ```
 
-# HUC data: Spatial regression models (figure for poster presentations only)
+# HUC data: Spatial regression models (figure for presentations only)
 ```{r, warning = FALSE, message = FALSE}
 source("1a_HUC processing and modelling.R")
 
@@ -563,6 +569,15 @@ knitr::kable(HUC_main.models[order(HUC_main.models$outcome,
                select(-formula, -percent.change, -UCI, -LCI, -coefficient, -coef.se, -t.value, -AIC) %>%
                filter(dep.var != "(Intercept)"))
 
+# wide version
+wide_main.models <- HUC_main.models %>% select(outcome.name, dep.var, full.coefficient, n.obs, R2)
+wide_main.models <- pivot_wider(wide_main.models, 
+                                id_cols = c("outcome.name", "n.obs", "R2"),
+                                names_from = dep.var, 
+                                values_from = full.coefficient)
+
+knitr::kable(wide_main.models %>% select(-"(Intercept)"))
+
 HUC_exclude.NDs$full.coefficient <- with(HUC_exclude.NDs, 
                                          paste(percent.change, " [", LCI, ", ", UCI, "]", sep = ""))
 
@@ -578,6 +593,14 @@ knitr::kable(HUC_exclude.NDs[order(HUC_exclude.NDs$outcome,
                                    HUC_exclude.NDs$dep.var, decreasing =F),]  %>% 
              select(-formula, -percent.change, -UCI, -LCI, -coefficient, -coef.se, -t.value, -AIC) %>%
                filter(dep.var != "(Intercept)"))
+
+wide_exclude.NDs <- HUC_exclude.NDs %>% select(outcome.name, dep.var, full.coefficient, n.obs, R2)
+wide_exclude.NDs <- pivot_wider(wide_exclude.NDs, 
+                                id_cols = c("outcome.name", "n.obs", "R2"),
+                                names_from = dep.var, 
+                                values_from = full.coefficient)
+
+knitr::kable(wide_exclude.NDs %>% select(-"(Intercept)"))
 
 top_sources <- HUC_main.models %>%
   filter(!is.na(coefficient.order)) %>%
@@ -650,7 +673,7 @@ if(FALSE) {
 
 ```
 
-# HUC maps (for supplement / poster presentations only)
+# HUC maps (for presentations only)
 ```{r}
 # categories for map
 HUC.PFAS <- HUC.PFAS %>%
@@ -675,7 +698,7 @@ HUC.PFAS <- HUC.PFAS %>%
 # transform projection for mapping
 HUC.PFAS_map <- st_transform(HUC.PFAS, crs = usmap::usmap_crs())
 
-# filtering out great lakes for clarity
+# filtering out HUCs containing great lakes for clarity
 HUC.PFAS_map <- subset(HUC.PFAS_map, HUC_NAME != "Lake Superior" &
                                      HUC_NAME != "Lake Erie" &
                                      HUC_NAME != "Lake Huron" &
@@ -784,7 +807,7 @@ if (FALSE) {
 
 ```
 
-# Additional HUC maps (for supplement / poster presentations only)
+# Additional HUC maps (for presentations only)
 ```{r}
 HUC.long <- HUC.PFAS_map %>% select(-contains("detect")) %>%
   pivot_longer(cols = c("PFOA", "PFOS", "PFNA", "PFHxS", "PFBS"),
@@ -907,8 +930,8 @@ ggplot(all.sources_models, aes(x = OR, y = dep.var.name2,
                   group = outcome.name),
              size = 4,     position = position_dodge(0.9), vjust = -1) +
     geom_vline(xintercept = 1, color = "grey", linetype = "dotted") +
-    labs(x = "", y = "",
-         subtitle = "Odds ratios [95% CI] corresponding to one-percentage-point increases\nin each sociodemographic factor") +
+    labs(x = "Odds ratio", y = "",
+         subtitle = "Odds ratios [95% CI] corresponding to one-percentage-point higher proportions of\neach sociodemographic factor") +
     theme_bw() +
     theme(panel.grid.minor.x = element_blank(), 
           panel.grid.major.x = element_blank(),
@@ -923,7 +946,7 @@ ggplot(all.sources_models, aes(x = OR, y = dep.var.name2,
           plot.margin = unit(c(0.1,0.1,0.1,0.1), "cm"))
 
 if (FALSE) {
-  ggsave("../Figures/sources_ORs.png", dpi = 500, height = 8, width = 10)
+  ggsave("../Figures/sources_ORs.png", dpi = 600, height = 8, width = 10)
 }
 
 ```
@@ -931,7 +954,7 @@ if (FALSE) {
 # demographics and PFAS regression results
 ```{r}
 source("1c_PFAS-demo modelling.R")
-source("1d_Secondary analysis modelling.R")
+source("1d_Secondary + sensitivity analysis modelling.R")
 
 # ready results before printing tables
 PFAS_models_partial <- PFAS_models_partial %>%
@@ -1029,7 +1052,8 @@ knitr::kable(all_MCL_models %>%
 
 # Detection limit table
 ```{r}
-DLs.table <- read.csv("../Merged PFAS data/DL_table.csv")
+# this is loaded from the statewide sampling repository
+DLs.table <- read.csv("/Users/jahredl/Dropbox/State PFAS data/Merged PFAS data/DL_table.csv")
 
 print(DLs.table)
 
@@ -1038,10 +1062,10 @@ DLs <- dat %>%
   pivot_longer(cols = c(ends_with("DL")), names_to = "Compound",
                values_to = "DL")
 
-# how many samples are from the final set of CWS?
+# how many samples are from the FINAL set of CWS? (after apply all exclusion criteria)
 nrow(dat[dat$PWSID %in% CWS_FN$PWSID, ])
 
-DLs <- DLs %>% filter(Compound != "PFBA_DL")
+DLs <- DLs %>% filter(Compound != "PFBA_DL" & Compound != "HFPODA_DL")
 
 DLs$Compound <- str_replace(string = DLs$Compound, pattern = "_DL", replacement = "")
 
@@ -1175,4 +1199,30 @@ if (FALSE){
   ggsave("../Figures/abstract art/art.png", dpi = 500, height = 6, width = 9)
 }
 ```
+
+# Missing outcome data
+```{r}
+library(ggmice)
+
+CWS_FN$missing <- is.na(CWS_FN$Any_detect)
+
+missing.Any <- plot_pattern(CWS_FN %>% select(PFOA = PFOA_detect, PFOS = PFOS_detect,
+                                              PFNA = PFNA_detect, PFHxS = PFHxS_detect,
+                                              PFBS = PFBS_detect, "All" = Any_detect))
+
+missing.Any +
+  scale_fill_manual(values = c("red", "blue"), labels = c("Missing", "Observed")) +
+  scale_alpha(range = 0.8, guide = "none") +
+  theme_mice() +
+  theme(axis.title.x.top = element_blank(),
+        axis.text.x.top = element_text(size = 15, face = "bold"),
+        axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15, margin = margin(l = 0.25, r = 0.25)),
+        legend.text = element_text(size = 12))
+
+ggsave("../Figures/missingness.png", dpi = 600, height = 6, width = 9)
+
+
+```
+
 
